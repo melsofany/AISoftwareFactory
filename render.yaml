@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: manus-agent-app
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MANUS_PASSWORD
+        fromDatabase:
+          name: manus-agent-db
+          property: password
+      - key: DEEPSEEK_API_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: manus-agent-db
+          property: connectionString
+
+databases:
+  - name: manus-agent-db
+    databaseName: manus_agent_db
+    user: manus_user
+    region: oregon
+    plan: free
