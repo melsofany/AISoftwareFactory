@@ -25,4 +25,61 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/**
+ * Conversations table to store chat sessions
+ */
+export const conversations = mysqlTable("conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;
+
+/**
+ * Messages table to store conversation messages
+ */
+export const messages = mysqlTable("messages", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversationId").notNull().references(() => conversations.id),
+  role: mysqlEnum("role", ["user", "assistant"]).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = typeof messages.$inferInsert;
+
+/**
+ * Tasks table to store agent tasks
+ */
+export const tasks = mysqlTable("tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversationId").notNull().references(() => conversations.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  status: mysqlEnum("status", ["pending", "running", "completed", "failed"]).default("pending").notNull(),
+  result: text("result"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = typeof tasks.$inferInsert;
+
+/**
+ * Logs table to store execution logs
+ */
+export const logs = mysqlTable("logs", {
+  id: int("id").autoincrement().primaryKey(),
+  taskId: int("taskId").notNull().references(() => tasks.id),
+  level: mysqlEnum("level", ["info", "warning", "error", "debug"]).default("info").notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Log = typeof logs.$inferSelect;
+export type InsertLog = typeof logs.$inferInsert;

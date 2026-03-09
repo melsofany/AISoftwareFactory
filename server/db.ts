@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, conversations, messages, tasks, logs, Conversation, Message, Task, Log, InsertConversation, InsertMessage, InsertTask, InsertLog } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,180 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function createConversation(userId: number, title: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot create conversation: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.insert(conversations).values({
+      userId,
+      title,
+    });
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to create conversation:", error);
+    throw error;
+  }
+}
+
+export async function getConversations(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get conversations: database not available");
+    return [];
+  }
+
+  try {
+    const result = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.userId, userId))
+      .orderBy(desc(conversations.updatedAt));
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to get conversations:", error);
+    throw error;
+  }
+}
+
+export async function addMessage(
+  conversationId: number,
+  role: "user" | "assistant",
+  content: string
+) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot add message: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.insert(messages).values({
+      conversationId,
+      role,
+      content,
+    });
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to add message:", error);
+    throw error;
+  }
+}
+
+export async function getMessages(conversationId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get messages: database not available");
+    return [];
+  }
+
+  try {
+    const result = await db
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(asc(messages.createdAt));
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to get messages:", error);
+    throw error;
+  }
+}
+
+export async function createTask(
+  conversationId: number,
+  title: string,
+  description?: string
+) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot create task: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.insert(tasks).values({
+      conversationId,
+      title,
+      description,
+    });
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to create task:", error);
+    throw error;
+  }
+}
+
+export async function updateTaskStatus(
+  taskId: number,
+  status: "pending" | "running" | "completed" | "failed",
+  result?: string
+) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot update task: database not available");
+    return undefined;
+  }
+
+  try {
+    const updateData: Record<string, unknown> = { status };
+    if (result !== undefined) {
+      updateData.result = result;
+    }
+    const response = await db
+      .update(tasks)
+      .set(updateData)
+      .where(eq(tasks.id, taskId));
+    return response;
+  } catch (error) {
+    console.error("[Database] Failed to update task:", error);
+    throw error;
+  }
+}
+
+export async function addLog(
+  taskId: number,
+  level: "info" | "warning" | "error" | "debug",
+  message: string
+) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot add log: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.insert(logs).values({
+      taskId,
+      level,
+      message,
+    });
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to add log:", error);
+    throw error;
+  }
+}
+
+export async function getLogs(taskId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get logs: database not available");
+    return [];
+  }
+
+  try {
+    const result = await db
+      .select()
+      .from(logs)
+      .where(eq(logs.taskId, taskId))
+      .orderBy(asc(logs.createdAt));
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to get logs:", error);
+    throw error;
+  }
+}
