@@ -147,6 +147,10 @@ function vitePluginManusDebugCollector(): Plugin {
 }
 
 async function getPlugins() {
+  if (process.env.NODE_ENV === "production") {
+    return [vitePluginManusDebugCollector()];
+  }
+
   const [
     { jsxLocPlugin },
     tailwindcss,
