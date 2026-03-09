@@ -15,6 +15,7 @@ COPY --from=build /usr/src/app/dist/index.js /usr/src/app/dist/index.js
 COPY --from=build /usr/src/app/dist/public /usr/src/app/dist/public
 COPY --from=build /usr/src/app/package.json /usr/src/app/package.json
 COPY --from=build /usr/src/app/pnpm-lock.yaml /usr/src/app/pnpm-lock.yaml
+COPY --from=build /usr/src/app/patches /usr/src/app/patches
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
 EXPOSE 3000
