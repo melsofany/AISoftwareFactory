@@ -11,7 +11,8 @@ RUN pnpm build
 
 FROM base AS runner
 WORKDIR /usr/src/app
-COPY --from=build /usr/src/app/dist /usr/src/app/dist
+COPY --from=build /usr/src/app/dist/index.js /usr/src/app/dist/index.js
+COPY --from=build /usr/src/app/dist/public /usr/src/app/dist/public
 COPY --from=build /usr/src/app/package.json /usr/src/app/package.json
 COPY --from=build /usr/src/app/pnpm-lock.yaml /usr/src/app/pnpm-lock.yaml
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
