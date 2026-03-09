@@ -187,6 +187,9 @@ export default defineConfig(async () => ({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      external: ["vite", "@builder.io/vite-plugin-jsx-loc", "@tailwindcss/vite", "@vitejs/plugin-react", "vite-plugin-manus-runtime"]
+    }
   },
   server: {
     host: true,
