@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { verifyPassword, createSessionCookie } from "./passwordAuth";
+import { verifyPassword, createSessionCookie, isValidSession } from "./passwordAuth";
 
 const router = Router();
 
@@ -22,6 +22,14 @@ router.post("/verify-password", (req: Request, res: Response) => {
   }
 
   return res.status(401).json({ success: false, error: "Invalid password" });
+});
+
+router.get("/check", (req: Request, res: Response) => {
+    const sessionId = req.cookies?.["manus-session"];
+    if (sessionId && isValidSession(sessionId)) {
+        return res.json({ authenticated: true });
+    }
+    return res.json({ authenticated: false });
 });
 
 export default router;
