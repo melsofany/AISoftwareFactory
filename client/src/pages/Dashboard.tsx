@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Send, LogOut, MessageSquare, Copy, Check, Menu, X, Sparkles } from "lucide-react";
+import { Plus, Send, LogOut, MessageSquare, Copy, Check, Menu, X, Sparkles, AlertTriangle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -23,30 +23,69 @@ interface Conversation {
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
-  const { logout } = useAuth();
+  const { logout, user, loading: authLoading, error: authError } = useAuth({ redirectOnUnauthenticated: true });
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
   const [input, setInput] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   // Use tRPC hooks instead of direct fetch
-  const { data: conversations = [], isLoading: loadingConversations, refetch: refetchConversations } = trpc.conversations.list.useQuery();
-  const { data: messages = [], isLoading: loadingMessages } = trpc.conversations.getMessages.useQuery(
+  const { 
+    data: conversations = [], 
+    isLoading: loadingConversations, 
+    refetch: refetchConversations,
+    error: conversationsError 
+  } = trpc.conversations.list.useQuery(undefined, {
+    retry: 2,
+    retryDelay: 1000,
+  });
+  
+  const { 
+    data: messages = [], 
+    isLoading: loadingMessages,
+    error: messagesError 
+  } = trpc.conversations.getMessages.useQuery(
     { conversationId: currentConversationId! },
-    { enabled: !!currentConversationId }
+    { 
+      enabled: !!currentConversationId,
+      retry: 2,
+      retryDelay: 1000,
+    }
   );
 
   const createMutation = trpc.conversations.create.useMutation({
     onSuccess: () => {
+      setDashboardError(null);
       refetchConversations();
+    },
+    onError: (error) => {
+      setDashboardError(`خطأ في إنشاء محادثة: ${error.message}`);
     }
   });
 
   const messageMutation = trpc.conversations.addMessage.useMutation({
     onSuccess: () => {
       setInput("");
+      setDashboardError(null);
+    },
+    onError: (error) => {
+      setDashboardError(`خطأ في إرسال الرسالة: ${error.message}`);
     }
   });
+
+  // Handle errors
+  useEffect(() => {
+    if (conversationsError) {
+      setDashboardError(`خطأ في تحميل المحادثات: ${conversationsError.message}`);
+    }
+  }, [conversationsError]);
+
+  useEffect(() => {
+    if (messagesError) {
+      setDashboardError(`خطأ في تحميل الرسائل: ${messagesError.message}`);
+    }
+  }, [messagesError]);
 
   // Set initial conversation
   useEffect(() => {
@@ -59,21 +98,34 @@ export default function Dashboard() {
     e.preventDefault();
     if (!input.trim() || !currentConversationId || messageMutation.isPending) return;
     
-    await messageMutation.mutateAsync({
-      conversationId: currentConversationId,
-      content: input
-    });
+    try {
+      await messageMutation.mutateAsync({
+        conversationId: currentConversationId,
+        content: input
+      });
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
   };
 
   const createNewConversation = async () => {
-    await createMutation.mutateAsync({
-      title: `محادثة جديدة - ${new Date().toLocaleString()}`
-    });
+    try {
+      await createMutation.mutateAsync({
+        title: `محادثة جديدة - ${new Date().toLocaleString('ar-SA')}`
+      });
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+    }
   };
 
   const handleLogout = async () => {
-    await logout();
-    setLocation("/login");
+    try {
+      await logout();
+      setLocation("/login");
+    } catch (error) {
+      console.error("Error logging out:", error);
+      setLocation("/login");
+    }
   };
 
   const copyToClipboard = (text: string, id: number) => {
@@ -81,6 +133,37 @@ export default function Dashboard() {
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-gray-600 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
+          <p className="text-gray-400">جاري التحميل...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if authentication failed
+  if (authError || !user) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
+        <div className="max-w-md text-center space-y-4">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
+          <h2 className="text-xl font-bold text-white">خطأ في المصادقة</h2>
+          <p className="text-gray-400">{authError?.message || "حدث خطأ في المصادقة"}</p>
+          <Button
+            onClick={() => setLocation("/login")}
+            className="bg-blue-500 hover:bg-blue-600 text-white"
+          >
+            العودة إلى تسجيل الدخول
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
@@ -167,6 +250,22 @@ export default function Dashboard() {
           </h2>
           <div className="w-6"></div>
         </div>
+
+        {/* Error Message */}
+        {dashboardError && (
+          <div className="bg-red-500/20 border-b border-red-500/50 p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-red-300">{dashboardError}</p>
+            </div>
+            <button
+              onClick={() => setDashboardError(null)}
+              className="text-red-400 hover:text-red-300"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Chat Area */}
         <div className="flex-1 overflow-hidden flex flex-col">

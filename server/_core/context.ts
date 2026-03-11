@@ -14,20 +14,35 @@ export async function createContext(
 ): Promise<TrpcContext> {
   let user: User | null = null;
 
-  // 1. Try password session auth first
-  const sessionId = opts.req.cookies?.["manus-session"];
-  if (sessionId && isValidSession(sessionId)) {
-    user = getMockUser();
-  }
-
-  // 2. Fallback to OAuth SDK if no password session
-  if (!user) {
-    try {
-      user = await sdk.authenticateRequest(opts.req);
-    } catch (error) {
-      // Authentication is optional for public procedures.
-      user = null;
+  try {
+    // 1. Try password session auth first
+    const sessionId = opts.req.cookies?.["manus-session"];
+    if (sessionId && isValidSession(sessionId)) {
+      user = getMockUser();
+      console.log("[Context] User authenticated via password session");
+      return {
+        req: opts.req,
+        res: opts.res,
+        user,
+      };
     }
+
+    // 2. Fallback to OAuth SDK if no password session
+    if (!user) {
+      try {
+        user = await sdk.authenticateRequest(opts.req);
+        if (user) {
+          console.log("[Context] User authenticated via OAuth");
+        }
+      } catch (error) {
+        // Authentication is optional for public procedures.
+        console.log("[Context] OAuth authentication failed:", error instanceof Error ? error.message : String(error));
+        user = null;
+      }
+    }
+  } catch (error) {
+    console.error("[Context] Unexpected error during context creation:", error);
+    user = null;
   }
 
   return {

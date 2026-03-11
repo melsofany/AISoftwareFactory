@@ -15,59 +15,89 @@ import { processAgentTask } from "../services/deepseek";
 export const conversationsRouter = router({
   // Get all conversations for current user
   list: publicProcedure.query(async ({ ctx }) => {
-    if (!ctx.user) {
-      throw new Error("Unauthorized");
+    try {
+      if (!ctx.user) {
+        console.warn("[Conversations] Unauthorized access attempt to list conversations");
+        throw new Error("Unauthorized");
+      }
+      const conversations = await getConversations(ctx.user.id);
+      console.log(`[Conversations] Retrieved ${conversations.length} conversations for user ${ctx.user.id}`);
+      return conversations;
+    } catch (error) {
+      console.error("[Conversations] Error listing conversations:", error);
+      throw error;
     }
-    return getConversations(ctx.user.id);
   }),
 
   // Create a new conversation
   create: publicProcedure
     .input(z.object({ title: z.string() }))
     .mutation(async ({ ctx, input }: any) => {
-      if (!ctx.user) {
-        throw new Error("Unauthorized");
+      try {
+        if (!ctx.user) {
+          console.warn("[Conversations] Unauthorized access attempt to create conversation");
+          throw new Error("Unauthorized");
+        }
+        const result = await createConversation(ctx.user.id, input.title);
+        console.log(`[Conversations] Created new conversation for user ${ctx.user.id}`);
+        return result;
+      } catch (error) {
+        console.error("[Conversations] Error creating conversation:", error);
+        throw error;
       }
-      return createConversation(ctx.user.id, input.title);
     }),
 
   // Get messages for a conversation
   getMessages: publicProcedure
     .input(z.object({ conversationId: z.number() }))
     .query(async ({ input }: any) => {
-      return getMessages(input.conversationId);
+      try {
+        const messages = await getMessages(input.conversationId);
+        console.log(`[Conversations] Retrieved ${messages.length} messages for conversation ${input.conversationId}`);
+        return messages;
+      } catch (error) {
+        console.error("[Conversations] Error getting messages:", error);
+        throw error;
+      }
     }),
 
   // Add a message and process with DeepSeek
   addMessage: publicProcedure
     .input(z.object({ conversationId: z.number(), content: z.string() }))
     .mutation(async ({ input }: any) => {
-      // Add user message
-      await addMessage(input.conversationId, "user", input.content);
-
-      // Get conversation history
-      const history = await getMessages(input.conversationId);
-
       try {
-        // Process with DeepSeek
-        const assistantResponse = await processAgentTask(
-          input.content,
-          history.map((msg) => ({
-            role: msg.role as "user" | "assistant",
-            content: msg.content,
-          }))
-        );
+        // Add user message
+        await addMessage(input.conversationId, "user", input.content);
+        console.log(`[Conversations] Added user message to conversation ${input.conversationId}`);
 
-        // Add assistant response
-        await addMessage(input.conversationId, "assistant", assistantResponse);
+        // Get conversation history
+        const history = await getMessages(input.conversationId);
 
-        return { success: true, response: assistantResponse };
+        try {
+          // Process with DeepSeek
+          const assistantResponse = await processAgentTask(
+            input.content,
+            history.map((msg) => ({
+              role: msg.role as "user" | "assistant",
+              content: msg.content,
+            }))
+          );
+
+          // Add assistant response
+          await addMessage(input.conversationId, "assistant", assistantResponse);
+          console.log(`[Conversations] Added assistant response to conversation ${input.conversationId}`);
+
+          return { success: true, response: assistantResponse };
+        } catch (error) {
+          console.error("[Conversations] Error processing with DeepSeek:", error);
+          const errorMessage =
+            "عذراً، حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.";
+          await addMessage(input.conversationId, "assistant", errorMessage);
+          return { success: false, error: errorMessage };
+        }
       } catch (error) {
-        console.error("Error processing with DeepSeek:", error);
-        const errorMessage =
-          "عذراً، حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.";
-        await addMessage(input.conversationId, "assistant", errorMessage);
-        return { success: false, error: errorMessage };
+        console.error("[Conversations] Error adding message:", error);
+        throw error;
       }
     }),
 
@@ -81,7 +111,14 @@ export const conversationsRouter = router({
       })
     )
     .mutation(async ({ input }: any) => {
-      return createTask(input.conversationId, input.title, input.description);
+      try {
+        const result = await createTask(input.conversationId, input.title, input.description);
+        console.log(`[Conversations] Created task for conversation ${input.conversationId}`);
+        return result;
+      } catch (error) {
+        console.error("[Conversations] Error creating task:", error);
+        throw error;
+      }
     }),
 
   // Update task status
@@ -94,7 +131,14 @@ export const conversationsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return updateTaskStatus(input.taskId, input.status, input.result);
+      try {
+        const result = await updateTaskStatus(input.taskId, input.status, input.result);
+        console.log(`[Conversations] Updated task ${input.taskId} status to ${input.status}`);
+        return result;
+      } catch (error) {
+        console.error("[Conversations] Error updating task status:", error);
+        throw error;
+      }
     }),
 
   // Add a log entry
@@ -107,13 +151,27 @@ export const conversationsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return addLog(input.taskId, input.level, input.message);
+      try {
+        const result = await addLog(input.taskId, input.level, input.message);
+        console.log(`[Conversations] Added ${input.level} log for task ${input.taskId}`);
+        return result;
+      } catch (error) {
+        console.error("[Conversations] Error adding log:", error);
+        throw error;
+      }
     }),
 
   // Get logs for a task
   getLogs: publicProcedure
     .input(z.object({ taskId: z.number() }))
     .query(async ({ input }) => {
-      return getLogs(input.taskId);
+      try {
+        const logs = await getLogs(input.taskId);
+        console.log(`[Conversations] Retrieved ${logs.length} logs for task ${input.taskId}`);
+        return logs;
+      } catch (error) {
+        console.error("[Conversations] Error getting logs:", error);
+        throw error;
+      }
     }),
 });
